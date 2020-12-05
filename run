@@ -8,9 +8,9 @@
 #############################################
 
 clients_count=5
-client_name_prefix='ua01c' # ua - country code
+client_name_prefix='uk01c' # uk - country code
 CA_NAME='CA_01'
-SERVER_NAME='UA-01' # UA - country code
+SERVER_NAME='UK-01' # UA - country code
 NETWORK='10.0.0.0' 
 MASK='255.255.255.0'
 NETWORK_SLASH_MASK='10.0.0.0/8'
@@ -230,3 +230,4 @@ network_preferences
 enable_firewall
 openvpn_start
 message
+
