@@ -1,0 +1,8 @@
+set_var EASYRSA_BATCH           "1"
+set_var EASYRSA_REQ_COUNTRY     "UA"
+set_var EASYRSA_REQ_PROVINCE    "KYIV"
+set_var EASYRSA_REQ_CITY        "KYIV"
+set_var EASYRSA_REQ_ORG	        "Foxford"
+set_var EASYRSA_REQ_EMAIL       "victor.novatis@gmail.com"
+set_var EASYRSA_REQ_OU          "movies"
+

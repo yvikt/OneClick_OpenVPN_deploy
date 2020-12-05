@@ -1,0 +1,8 @@
+# START OPENVPN RULES
+# NAT table rules
+*nat
+:POSTROUTING ACCEPT [0:0]
+# Allow traffic from OpenVPN client to eth0 (change to the interface you discovered!)
+-A POSTROUTING -s NETWORK_SLASH_MASK -o NIC -j MASQUERADE
+COMMIT
+# END OPENVPN RULES
