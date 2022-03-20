@@ -1,6 +1,6 @@
 #
 port PORT
-proto udp4
+proto PROTO
 dev tun
 user nobody
 group nogroup

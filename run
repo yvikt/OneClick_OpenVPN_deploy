@@ -29,6 +29,7 @@ IP=$(ip addr | \
      head -1 \
     )
 PORT=11941
+PROTO='udp'
 # Get Internet network interface name with default route
 NIC=$(ip -4 route ls | grep default | grep -Po '(?<=dev )(\S+)' | head -1)
 
@@ -49,9 +50,11 @@ cp $TEMPLATES_DIR/fw-instructions-template $TEMP_DIR/fw-instructions
 # set IP and PORT for client-config
 sed -i "s/IP/$IP/g" $TEMP_DIR/client-config
 sed -i "s/PORT/$PORT/g" $TEMP_DIR/client-config
+sed -i "s/PROTO/$PROTO/g" $TEMP_DIR/client-config
 
 # set PORT, SERVER_NAME, NETWORK, MASK, DNS for server-config 
 sed -i "s/PORT/$PORT/g" $TEMP_DIR/server-config
+sed -i "s/PROTO/$PROTO/g" $TEMP_DIR/server-config
 sed -i "s/SERVER/$SERVER_NAME/g" $TEMP_DIR/server-config
 sed -i "s/NETWORK/$NETWORK/g" $TEMP_DIR/server-config
 sed -i "s/MASK/$MASK/g" $TEMP_DIR/server-config

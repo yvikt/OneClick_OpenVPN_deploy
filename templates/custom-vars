@@ -5,4 +5,6 @@ set_var EASYRSA_REQ_CITY        "London"
 set_var EASYRSA_REQ_ORG	        "Tower"
 set_var EASYRSA_REQ_EMAIL       "albert_einstein@gmail.com"
 set_var EASYRSA_REQ_OU          "entertainment"
+set_var EASYRSA_CERT_EXPIRE	3650
+set_var EASYRSA_CRL_DAYS	3650
 

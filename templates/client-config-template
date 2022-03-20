@@ -1,6 +1,6 @@
 client
 dev tun
-proto udp
+proto PROTO
 remote IP PORT
 resolv-retry infinite
 nobind
