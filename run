@@ -36,7 +36,7 @@ NIC=$(ip -4 route ls | grep default | grep -Po '(?<=dev )(\S+)' | head -1)
 # install necessary packages
 function install_packages {
 	apt update && apt upgrade -y
-	apt install -y curl vim tmux htop mc openvpn vnstat
+	apt install -y net-tools curl vim tmux htop mc openvpn vnstat
 }
 
 # create working files
