@@ -1,21 +1,20 @@
 #!/bin/bash
 
 #############################################
-# This script doing all dirty job for you   #
+# This script performs all dirty job        #
 # and simply creates working OpenVPN server #
 # with 100 and more clients config files    #
-# Viktor Yakovenko  (no Warrenty) ;-)       #
+# Viktor Yakovenko  (no Warranty) ;-)       #
 #############################################
 
-clients_count=5
+clients_count=2
 client_name_prefix='uk01c' # uk - country code
 CA_NAME='CA_01'
 SERVER_NAME='UK-01' # UA - country code
 NETWORK='10.0.0.0' 
 MASK='255.255.255.0'
 NETWORK_SLASH_MASK='10.0.0.0/8'
-DNS_SERVERS='88.208.244.225 109.228.0.238 194.187.251.67' # UK Gloucester, Microsoft, Manchester
-#DNS_SERVERS='208.67.222.220 208.67.222.222' # Poland
+DNS_SERVERS='77.92.85.48 35.178.60.174 176.58.113.172 178.62.57.141 5.63.155.18'
 #DNS_SERVERS='8.8.8.8 4.4.4.4' # Google
 DNS=''
 SOURCE_DIR=$(pwd)
@@ -80,11 +79,12 @@ cat $TEMP_DIR/server-config > /etc/openvpn/server.conf
 
 function create_ca {
 cd $TEMP_DIR
-# get last version of EasyRsa
-wget https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.8/EasyRSA-3.0.8.tgz
+# get EasyRsa
+echo "INFO: download EasyRsa"
+wget https://github.com/OpenVPN/easy-rsa/releases/download/v3.2.0/EasyRSA-3.2.0.tgz
 
 # extracting files 
-tar zxf EasyRSA-3.0.8.tgz --one-top-level=/etc/openvpn/easy-rsa  --strip-components=1
+tar zxf EasyRSA-3.2.0.tgz --one-top-level=/etc/openvpn/easy-rsa  --strip-components=1
 
 # ??
 ln -s /etc/openvpn/easy-rsa/openssl-easyrsa.cnf /etc/openvpn/easy-rsa/openssl.cnf
@@ -95,9 +95,11 @@ cp vars.example vars
 cat $TEMPLATES_DIR/custom-vars >> vars
 
 #initialize PKI
+echo "INFO: initialize PKI"
 ./easyrsa init-pki
 
 # create a CA
+echo "INFO: create a CA"
 #./easyrsa build-ca nopass
 ./easyrsa --batch --req-cn=$CA_NAME build-ca nopass
 }
@@ -105,25 +107,35 @@ cat $TEMPLATES_DIR/custom-vars >> vars
 ### SERVER SECTION ###
 
 function create_server_sertificate {
+echo "INFO: START SERVER SECTION"
 cd /etc/openvpn/easy-rsa
 # create request for server private key
+echo "INFO: create request for server private key"
 #./easyrsa gen-req server nopass
-./easyrsa --batch --req-cn=$SERVER_NAME gen-req $SERVER_NAME nopass
+#./easyrsa --batch --req-cn=$SERVER_NAME gen-req $SERVER_NAME nopass
+./easyrsa gen-req $SERVER_NAME nopass
 
 # sign server key
+echo "INFO: sign server key"
 ./easyrsa sign-req server $SERVER_NAME 
 
 # generate DH key
+echo "INFO: generate DH key"
 if [ -f pki/dh.pem ]; then rm pki/dh.pem; fi
 ./easyrsa gen-dh
 
 # generate TLS key
-openvpn --genkey --secret ta.key
+echo "INFO: generate TLS key"
+#openvpn --genkey --secret ta.key
+openvpn --genkey secret ta.key
+echo "INFO: END SERVER SECTION"
+echo ""
 }
 
 ###  CLIENT SECTION  ###
 
 function create_clients {
+echo "INFO: START CLIENTs SECTION"
 # create all necessary files for all clients
 cd /etc/openvpn/easy-rsa
 
@@ -141,11 +153,13 @@ do
   echo ""
   echo "---GENERATING REQUEST FOR $client---"
 #  ./easyrsa gen-req $client nopass batch
-  ./easyrsa --batch --req-cn=$client gen-req $client nopass
+#  ./easyrsa --batch --req-cn=$client gen-req $client nopass
+  ./easyrsa gen-req $client nopass
   echo "---SIGNING SERTIFICATE FOR $client---"
-  ./easyrsa sign-req client $client batch
-  echo "make config file for $client"
-		        
+#  ./easyrsa sign-req client $client batch
+  ./easyrsa sign-req client $client
+  
+  echo "INFO: make config file for $client"
   cat $TEMP_DIR/client-config \
   <(echo -e '<ca>') \
   pki/ca.crt \
@@ -164,6 +178,8 @@ done
 
 # generate CRL (CRL TODO)
 ./easyrsa gen-crl
+  echo "INFO: END CLIENTs SECTION"
+  echo ""
 }
 
 # NETWORK SETTINGS
@@ -191,7 +207,7 @@ sed -i 's/DEFAULT_FORWARD_POLICY="DROP"/DEFAULT_FORWARD_POLICY="ACCEPT"/' /etc/d
 }
 
 function enable_firewall {
-echo "enabling firewall"
+echo "INFO: enabling firewall"
 ufw allow $PORT/udp
 ufw allow OpenSSH
 ufw disable
@@ -199,38 +215,43 @@ ufw enable
 }
 
 function openvpn_start {
-echo "enabling openvpn@server service"
+echo "INFO: enabling openvpn@server service"
 # make openvpn starts on system load
 systemctl enable openvpn@server
 #systemctl -f enable openvpn-server@server.service
 
 # start openvpn server
-echo "starting openvpn@server service"
+echo "INFO: starting openvpn@server service"
 systemctl start openvpn@server
-echo "restarting openvpn@server service"
+echo "INFO: restarting openvpn@server service"
 systemctl restart openvpn@server
 #systemctl start openvpn-server@server.service
 }
 
 function message {
 echo "ALL DONE"
-echo "to copy all client files use following command:"
+echo ""
+echo "INFO: to copy all client files use following command:"
 echo "scp -r root@$IP:/etc/openvpn/clients ./OpenVPN_clients"
-echo "for quick test you may use following command:"
+echo ""
+echo "INFO: for quick test you may use following command:"
 echo "sudo openvpn --config OpenVPN_clients/client-001.ovpn"
-echo "GOOD LUCK :-)"
-echo "view network bandwith utilization with command:"
+echo ""
+echo "INFO: view network bandwith utilization with command:"
 echo "vnstat -i $NIC -l"
+echo ""
+echo "GOOD LUCK :-)"
+echo ""
 }
 
-install_packages
+##install_packages
 create_working_files
 create_server_config
 create_ca
 create_server_sertificate
 create_clients
-network_preferences
-enable_firewall
+##network_preferences
+##enable_firewall
 openvpn_start
 message
 
