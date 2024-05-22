@@ -241,7 +241,7 @@ function message {
 	echo ""
 }
 
-##install_packages
+install_packages
 create_working_files
 create_server_config
 create_ca
