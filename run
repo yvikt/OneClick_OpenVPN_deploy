@@ -1,22 +1,22 @@
 #!/bin/bash
 
 #############################################
-# This script doing all dirty job for you   #
+# This script performs all dirty job        #
 # and simply creates working OpenVPN server #
 # with 100 and more clients config files    #
-# Viktor Yakovenko  (no Warrenty) ;-)       #
+# Viktor Yakovenko  (no Warranty) ;-)       #
 #############################################
 
-clients_count=5
-client_name_prefix='uk01c' # uk - country code
+clients_count=100
+client_name_prefix='uk01c' # countryCode clientNumber
 CA_NAME='CA_01'
-SERVER_NAME='UK-01' # UA - country code
+SERVER_NAME='UK-01' # CountryCode_ServerNumber
 NETWORK='10.0.0.0' 
 MASK='255.255.255.0'
 NETWORK_SLASH_MASK='10.0.0.0/8'
-DNS_SERVERS='88.208.244.225 109.228.0.238 194.187.251.67' # UK Gloucester, Microsoft, Manchester
-#DNS_SERVERS='208.67.222.220 208.67.222.222' # Poland
-#DNS_SERVERS='8.8.8.8 4.4.4.4' # Google
+GOOGLE_DNS_SERVERS='8.8.8.8 4.4.4.4'
+UK_DNS_SERVERS='77.92.85.48 35.178.60.174 176.58.113.172 178.62.57.141 5.63.155.18' #London
+DNS_SERVERS=$UK_DNS_SERVERS
 DNS=''
 SOURCE_DIR=$(pwd)
 TEMPLATES_DIR="$SOURCE_DIR/templates"
@@ -35,192 +35,210 @@ NIC=$(ip -4 route ls | grep default | grep -Po '(?<=dev )(\S+)' | head -1)
 
 # install necessary packages
 function install_packages {
+	echo "INFO: install necessary packages"
 	apt update && apt upgrade -y
 	apt install -y net-tools curl vim tmux htop mc openvpn vnstat
 }
 
 # create working files
 function create_working_files {
-if [ -d $TEMP_DIR ]; then rm -r temp; fi
-mkdir $TEMP_DIR
-cp $TEMPLATES_DIR/client-config-template $TEMP_DIR/client-config
-cp $TEMPLATES_DIR/server-config-template $TEMP_DIR/server-config
-cp $TEMPLATES_DIR/fw-instructions-template $TEMP_DIR/fw-instructions
+	echo "INFO: create working files"
+	if [ -d $TEMP_DIR ]; then rm -r temp; fi
+	mkdir $TEMP_DIR
+	cp $TEMPLATES_DIR/client-config-template $TEMP_DIR/client-config
+	cp $TEMPLATES_DIR/server-config-template $TEMP_DIR/server-config
+	cp $TEMPLATES_DIR/fw-instructions-template $TEMP_DIR/fw-instructions
 
-# set IP and PORT for client-config
-sed -i "s/IP/$IP/g" $TEMP_DIR/client-config
-sed -i "s/PORT/$PORT/g" $TEMP_DIR/client-config
-sed -i "s/PROTO/$PROTO/g" $TEMP_DIR/client-config
+	# set IP and PORT for client-config
+	sed -i "s/IP/$IP/g" $TEMP_DIR/client-config
+	sed -i "s/PORT/$PORT/g" $TEMP_DIR/client-config
+	sed -i "s/PROTO/$PROTO/g" $TEMP_DIR/client-config
 
-# set PORT, SERVER_NAME, NETWORK, MASK, DNS for server-config 
-sed -i "s/PORT/$PORT/g" $TEMP_DIR/server-config
-sed -i "s/PROTO/$PROTO/g" $TEMP_DIR/server-config
-sed -i "s/SERVER/$SERVER_NAME/g" $TEMP_DIR/server-config
-sed -i "s/NETWORK/$NETWORK/g" $TEMP_DIR/server-config
-sed -i "s/MASK/$MASK/g" $TEMP_DIR/server-config
+	# set PORT, SERVER_NAME, NETWORK, MASK, DNS for server-config 
+	sed -i "s/PORT/$PORT/g" $TEMP_DIR/server-config
+	sed -i "s/PROTO/$PROTO/g" $TEMP_DIR/server-config
+	sed -i "s/SERVER/$SERVER_NAME/g" $TEMP_DIR/server-config
+	sed -i "s/NETWORK/$NETWORK/g" $TEMP_DIR/server-config
+	sed -i "s/MASK/$MASK/g" $TEMP_DIR/server-config
 
-for line in $(echo $DNS_SERVERS | tr ' ' '\n')
-do 
+	for line in $(echo $DNS_SERVERS | tr ' ' '\n')
+	do 
 	DNS="${DNS}push \"dhcp-option DNS $line\"\n"
-done
-#$DNS=${DNS::-1} # try to delete last \n symbol
-sed -i "s/DNS/$DNS/g" $TEMP_DIR/server-config
+	done
+	#$DNS=${DNS::-1} # try to delete last \n symbol
+	sed -i "s/DNS/$DNS/g" $TEMP_DIR/server-config
 
-# set preferences for firewall
-# use another delimiter: | instead / because we have slash in variable (also can use @)
-sed -i "s|NETWORK_SLASH_MASK|$NETWORK_SLASH_MASK|g" $TEMP_DIR/fw-instructions
-sed -i "s/NIC/$NIC/g" $TEMP_DIR/fw-instructions
+	# set preferences for firewall
+	# use another delimiter: | instead / because we have slash in variable (also can use @)
+	sed -i "s|NETWORK_SLASH_MASK|$NETWORK_SLASH_MASK|g" $TEMP_DIR/fw-instructions
+	sed -i "s/NIC/$NIC/g" $TEMP_DIR/fw-instructions
 }
 
 function create_server_config {
-cat $TEMP_DIR/server-config > /etc/openvpn/server.conf
+	echo "INFO: create server config"
+	cat $TEMP_DIR/server-config > /etc/openvpn/server.conf
 }
 
 ###  EASY-RSA SECTION  ###
 
 function create_ca {
-cd $TEMP_DIR
-# get last version of EasyRsa
-wget https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.8/EasyRSA-3.0.8.tgz
+	cd $TEMP_DIR
+	# get EasyRsa
+	echo "INFO: download EasyRsa"
+	wget https://github.com/OpenVPN/easy-rsa/releases/download/v3.2.0/EasyRSA-3.2.0.tgz
 
-# extracting files 
-tar zxf EasyRSA-3.0.8.tgz --one-top-level=/etc/openvpn/easy-rsa  --strip-components=1
+	# extracting files 
+	tar zxf EasyRSA-3.2.0.tgz --one-top-level=/etc/openvpn/easy-rsa  --strip-components=1
 
-# ??
-ln -s /etc/openvpn/easy-rsa/openssl-easyrsa.cnf /etc/openvpn/easy-rsa/openssl.cnf
+	# TODO is it necessary to create this link?
+	ln -s /etc/openvpn/easy-rsa/openssl-easyrsa.cnf /etc/openvpn/easy-rsa/openssl.cnf
 
-#
-cd /etc/openvpn/easy-rsa
-cp vars.example vars
-cat $TEMPLATES_DIR/custom-vars >> vars
+	cd /etc/openvpn/easy-rsa
+	cp vars.example vars
+	cat $TEMPLATES_DIR/custom-vars >> vars
 
-#initialize PKI
-./easyrsa init-pki
+	#initialize PKI
+	echo "INFO: initialize PKI"
+	./easyrsa init-pki
 
-# create a CA
-#./easyrsa build-ca nopass
-./easyrsa --batch --req-cn=$CA_NAME build-ca nopass
+	# create a CA
+	echo "INFO: create a CA"
+	./easyrsa --req-cn=$CA_NAME build-ca nopass
 }
 
 ### SERVER SECTION ###
 
 function create_server_sertificate {
-cd /etc/openvpn/easy-rsa
-# create request for server private key
-#./easyrsa gen-req server nopass
-./easyrsa --batch --req-cn=$SERVER_NAME gen-req $SERVER_NAME nopass
+	echo "INFO: START SERVER SECTION"
+	cd /etc/openvpn/easy-rsa
+	# create request for server private key
+	echo "INFO: create request for server private key"
+	./easyrsa gen-req $SERVER_NAME nopass
 
-# sign server key
-./easyrsa sign-req server $SERVER_NAME 
+	# sign server key
+	echo "INFO: sign server key"
+	./easyrsa sign-req server $SERVER_NAME 
 
-# generate DH key
-if [ -f pki/dh.pem ]; then rm pki/dh.pem; fi
-./easyrsa gen-dh
+	# generate DH key
+	echo "INFO: generate DH key"
+	if [ -f pki/dh.pem ]; then rm pki/dh.pem; fi
+	./easyrsa gen-dh
 
-# generate TLS key
-openvpn --genkey --secret ta.key
+	# generate TLS key
+	echo "INFO: generate TLS key"
+	openvpn --genkey secret ta.key
+	echo "INFO: END SERVER SECTION"
+	echo ""
 }
 
 ###  CLIENT SECTION  ###
 
 function create_clients {
-# create all necessary files for all clients
-cd /etc/openvpn/easy-rsa
+	echo "INFO: START CLIENTs SECTION"
+	# create all necessary files for all clients
+	cd /etc/openvpn/easy-rsa
 
-if [ -d $CLIENTS_DIR ]; then rm -r $CLIENTS_DIR; fi
-mkdir $CLIENTS_DIR
+	if [ -d $CLIENTS_DIR ]; then rm -r $CLIENTS_DIR; fi
+	mkdir $CLIENTS_DIR
 
-# for Linux Network Manager 
-cp ta.key $CLIENTS_DIR
+	# for Linux Network Manager 
+	cp ta.key $CLIENTS_DIR
 
-for (( i=1; i <= $clients_count; i++ ))
-do
-  client=$(printf 'client-%03d' $i)
-  client_file_name=$(printf '%s%03d' $client_name_prefix $i)
-  echo "|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||"
-  echo ""
-  echo "---GENERATING REQUEST FOR $client---"
-#  ./easyrsa gen-req $client nopass batch
-  ./easyrsa --batch --req-cn=$client gen-req $client nopass
-  echo "---SIGNING SERTIFICATE FOR $client---"
-  ./easyrsa sign-req client $client batch
-  echo "make config file for $client"
-		        
-  cat $TEMP_DIR/client-config \
-  <(echo -e '<ca>') \
-  pki/ca.crt \
-  <(echo -e '</ca>\n<cert>') \
-  pki/issued/${client}.crt \
-  <(echo -e '</cert>\n<key>') \
-  pki/private/${client}.key \
-  <(echo -e '</key>\n<tls-crypt>') \
-  ta.key \
-  <(echo -e '</tls-crypt>') \
-  > $CLIENTS_DIR/$client_file_name.ovpn
+	for (( i=1; i <= $clients_count; i++ ))
+	do
+	client=$(printf 'client-%03d' $i)
+  	client_file_name=$(printf '%s%03d' $client_name_prefix $i)
+  	echo "|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||"
+  	echo ""
+  	echo "---GENERATING REQUEST FOR $client---"
+	./easyrsa gen-req $client nopass
+  	echo "---SIGNING SERTIFICATE FOR $client---"
+	./easyrsa sign-req client $client
+  
+	echo "INFO: make config file for $client"
+	cat $TEMP_DIR/client-config \
+	<(echo -e '<ca>') \
+	pki/ca.crt \
+	<(echo -e '</ca>\n<cert>') \
+	pki/issued/${client}.crt \
+	<(echo -e '</cert>\n<key>') \
+	pki/private/${client}.key \
+	<(echo -e '</key>\n<tls-crypt>') \
+	ta.key \
+	<(echo -e '</tls-crypt>') \
+	> $CLIENTS_DIR/$client_file_name.ovpn
  			 
-  echo "---CONFIG FILE FOR $client SUCCESSFULLY CREATED---"
-  echo ""
-done
+	echo "---CONFIG FILE FOR $client SUCCESSFULLY CREATED---"
+	echo ""
+	done
 
-# generate CRL (CRL TODO)
-./easyrsa gen-crl
+	# generate CRL (CRL TODO)
+	./easyrsa gen-crl
+	echo "INFO: END CLIENTs SECTION"
+	echo ""
 }
 
 # NETWORK SETTINGS
 
 function network_preferences {
-if [ ! -f /etc/sysctl.conf.bkp ]; then
+	if [ ! -f /etc/sysctl.conf.bkp ]; then
 	echo "Creating sysctl.conf backup..."
 	cp /etc/sysctl.conf /etc/sysctl.conf.bkp
-fi
-# echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
-sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' /etc/sysctl.conf
-sysctl -p
+	fi
+	# TODO add new line or uncomment it if exists
+	# echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+	sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' /etc/sysctl.conf
+	sysctl -p
 
-if [ ! -f /etc/ufw/before.rules.bkp ]; then
+	if [ ! -f /etc/ufw/before.rules.bkp ]; then
 	echo "Creating ufw_before_rules backup..."
 	cp /etc/ufw/before.rules /etc/ufw/before.rules.bkp
-fi
-cat  $TEMP_DIR/fw-instructions /etc/ufw/before.rules.bkp > /etc/ufw/before.rules
+	fi
+	cat  $TEMP_DIR/fw-instructions /etc/ufw/before.rules.bkp > /etc/ufw/before.rules
 
-if [ ! -f /etc/default/ufw.bkp ]; then
+	if [ ! -f /etc/default/ufw.bkp ]; then
 	echo "Creating /etc/default/ufw backup..."
 	cp /etc/default/ufw /etc/default/ufw.bkp
-fi
-sed -i 's/DEFAULT_FORWARD_POLICY="DROP"/DEFAULT_FORWARD_POLICY="ACCEPT"/' /etc/default/ufw
+	fi
+	sed -i 's/DEFAULT_FORWARD_POLICY="DROP"/DEFAULT_FORWARD_POLICY="ACCEPT"/' /etc/default/ufw
 }
 
 function enable_firewall {
-echo "enabling firewall"
-ufw allow $PORT/udp
-ufw allow OpenSSH
-ufw disable
-ufw enable
+	echo "INFO: enabling firewall"
+	ufw allow $PORT/$PROTO
+	ufw allow OpenSSH
+	ufw disable
+	ufw enable
 }
 
 function openvpn_start {
-echo "enabling openvpn@server service"
-# make openvpn starts on system load
-systemctl enable openvpn@server
-#systemctl -f enable openvpn-server@server.service
+	echo "INFO: enabling openvpn@server service"
+	# make openvpn starts on system load
+	systemctl enable openvpn@server
+	#systemctl -f enable openvpn-server@server.service
 
-# start openvpn server
-echo "starting openvpn@server service"
-systemctl start openvpn@server
-echo "restarting openvpn@server service"
-systemctl restart openvpn@server
-#systemctl start openvpn-server@server.service
+	# start openvpn server
+	echo "INFO: starting openvpn@server service"
+	systemctl start openvpn@server
+	echo "INFO: restarting openvpn@server service"
+	systemctl restart openvpn@server
+	#systemctl start openvpn-server@server.service
 }
 
 function message {
-echo "ALL DONE"
-echo "to copy all client files use following command:"
-echo "scp -r root@$IP:/etc/openvpn/clients ./OpenVPN_clients"
-echo "for quick test you may use following command:"
-echo "sudo openvpn --config OpenVPN_clients/client-001.ovpn"
-echo "GOOD LUCK :-)"
-echo "view network bandwith utilization with command:"
-echo "vnstat -i $NIC -l"
+	echo "ALL DONE"
+	echo ""
+	echo "INFO: to copy all client files use following command:"
+	echo "scp -r root@$IP:/etc/openvpn/clients ./OpenVPN_clients"
+	echo ""
+	echo "INFO: for quick test you may use following command:"
+	echo "sudo openvpn --config OpenVPN_clients/client-001.ovpn"
+	echo ""
+	echo "INFO: view network bandwith utilization with command:"
+	echo "vnstat -i $NIC -l"
+	echo ""
+	echo "GOOD LUCK :-)"
+	echo ""
 }
 
 install_packages
